@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
-use crypto::symmetriccipher::BlockEncryptor as _;
 use crypto::symmetriccipher::BlockDecryptor as _;
+use crypto::symmetriccipher::BlockEncryptor as _;
 
 pub fn hex_to_b64(hex: &str) -> String {
     base64::encode(hex::decode(hex).expect("invalid hex"))
@@ -31,7 +31,7 @@ pub fn aes_128_ecb_enc(mut input: Vec<u8>, key: &[u8]) -> Vec<u8> {
     assert!(key.len() == 16);
 
     pkcs7_padding(&mut input, 16);
-    
+
     let mut ret = Vec::new();
 
     for chunk in input.chunks_exact(16) {
@@ -74,7 +74,7 @@ pub fn aes_128_cbc_enc(mut input: Vec<u8>, key: &[u8], iv: &[u8]) -> Vec<u8> {
     let dec = crypto::aessafe::AesSafe128Encryptor::new(key);
 
     pkcs7_padding(&mut input, 16);
-    
+
     let mut previous = [0u8; 16usize];
     previous.copy_from_slice(iv);
 
@@ -215,7 +215,6 @@ pub fn encryption_oracle(input: Vec<u8>, detector: impl FnOnce(&[u8]) -> bool) {
         assert!(!detector(&encrypted));
     }
 }
-
 
 use proptest::prelude::*;
 proptest! {

@@ -30,7 +30,7 @@ fn challenge11() {
         encryption_oracle(input.to_vec(), |encrypted| {
             let first_half = &encrypted[0..15];
             let last_half = &encrypted[16..31];
-            
+
             first_half != last_half
         });
     }
@@ -40,7 +40,7 @@ fn challenge11() {
 fn challenge12() {
     let unknown_string = hex::decode(include_str!("12.txt")).unwrap();
     let key: [u8; 16] = rand::random();
-    
+
     let encryptor = |my_string: &[u8]| {
         let mut to_encrypt = Vec::new();
 
@@ -52,13 +52,13 @@ fn challenge12() {
 
     let block_size;
 
-    { // figure out block size
+    {
+        // figure out block size
         let mut my_string = Vec::new();
         let baseline_size = encryptor(&my_string).len();
         while encryptor(&my_string).len() == baseline_size {
             my_string.push(0);
         }
-
 
         let new_baseline_size = encryptor(&my_string).len();
         while encryptor(&my_string).len() == new_baseline_size {
@@ -70,7 +70,7 @@ fn challenge12() {
 
     assert_eq!(block_size, 16);
 
-    let to_add = vec![0u8; block_size*3];
+    let to_add = vec![0u8; block_size * 3];
 
     let encrypted = encryptor(&to_add);
 
@@ -80,7 +80,7 @@ fn challenge12() {
 
     assert!(a == b);
     // encrypting same value with same key using ECB gives the same result regardless of position
-    
+
     let decrypt_starting_with = |input: &[u8]| {
         assert!(input.len() < block_size);
 
@@ -111,12 +111,11 @@ fn challenge12() {
     assert_eq!(decrypt_starting_with(&[]), b'R');
 
     let mut guess = Vec::new();
-    for _ in 0..block_size-1 {
+    for _ in 0..block_size - 1 {
         let ch = decrypt_starting_with(&guess);
         guess.push(ch);
     }
 
-    
     // now we know the first block_size bytes, we can use that to brute force the rest of them
     //
     // We want to get the value of encrypt_block where the first block_size-1 bytes are *known*,
@@ -124,7 +123,7 @@ fn challenge12() {
     //
     let message_length = encryptor(&[]).len();
 
-    for decrypt_idx in block_size-1..message_length {
+    for decrypt_idx in block_size - 1..message_length {
         let padding_amount = (block_size - ((decrypt_idx + 1) % block_size)) % block_size;
 
         // unknown_string[decrypt_idx] must be at the end of a block
@@ -156,8 +155,8 @@ fn challenge12() {
         //
         let mut found = false;
         for guess_byte in 0..=255 {
-            let mut tg = guess[guess.len()+1-block_size..].to_vec();
-            assert_eq!(tg.len(), block_size-1);
+            let mut tg = guess[guess.len() + 1 - block_size..].to_vec();
+            assert_eq!(tg.len(), block_size - 1);
 
             tg.push(guess_byte);
 
@@ -176,7 +175,7 @@ fn challenge12() {
                 break;
             }
         }
-        if found == false {
+        if !found {
             // we couldn't find a block... let's stop here??????
             break;
         }
@@ -184,8 +183,8 @@ fn challenge12() {
 
     let padding_amount = *guess.last().unwrap() as usize;
 
-    let guess_msg = &guess[0..guess.len()-padding_amount-1];
-    
+    let guess_msg = &guess[0..guess.len() - padding_amount - 1];
+
     let final_answer = String::from_utf8(guess_msg.to_vec()).unwrap();
 
     assert_eq!(final_answer, "Rollin\' in my 5.0\nWith my rag-top down so my hair can blow\nThe girlies on standby waving just to say hi\nDid you stop? No, I just drove by");
