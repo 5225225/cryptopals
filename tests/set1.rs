@@ -1,9 +1,5 @@
 use itertools::Itertools;
 
-use crypto::buffer::WriteBuffer as _;
-use crypto::symmetriccipher::BlockEncryptor as _;
-use crypto::symmetriccipher::BlockDecryptor as _;
-
 use cryptopals::*;
 
 #[test]
@@ -46,10 +42,10 @@ fn challenge3() {
 #[test]
 fn challenge4() {
     let inputs = include_str!("4.txt")
-        .split("\n")
+        .split('\n')
         .map(|x| hex::decode(x).unwrap());
 
-    let mut tries: Vec<Vec<u8>> = (0..=255)
+    let tries: Vec<Vec<u8>> = (0..=255)
         .cartesian_product(inputs)
         .map(|(byte, line)| xor(&line, &[byte]))
         .collect();
@@ -139,10 +135,10 @@ fn challenge7() {
 #[test]
 fn challenge8() {
     let data = include_str!("8.txt")
-        .split("\n")
+        .split('\n')
         .map(|x| hex::decode(x).unwrap());
 
-    for (idx, line) in data.enumerate() {
+    for line in data {
         let mut found = std::collections::HashSet::new();
         let mut expected = 0;
         let chunks = line.chunks_exact(16);

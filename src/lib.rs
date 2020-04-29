@@ -1,8 +1,5 @@
 #![allow(dead_code)]
 
-use itertools::Itertools;
-
-use crypto::buffer::WriteBuffer as _;
 use crypto::symmetriccipher::BlockEncryptor as _;
 use crypto::symmetriccipher::BlockDecryptor as _;
 
@@ -173,15 +170,15 @@ pub fn english_score(x: &[u8]) -> impl Ord {
 }
 
 pub fn solve_sc(input: &[u8]) -> u8 {
-    let mut tries: Vec<Vec<u8>> = (0..=255)
+    let tries: Vec<Vec<u8>> = (0..=255)
         .map(|val| xor(&input, &[val]))
-        .map(|mut x| x.to_ascii_lowercase())
+        .map(|x| x.to_ascii_lowercase())
         .collect::<Vec<_>>();
 
     tries
         .into_iter()
         .enumerate()
-        .max_by_key(|(idx, x)| english_score(x))
+        .max_by_key(|(_idx, x)| english_score(x))
         .unwrap()
         .0 as u8
 }
@@ -217,14 +214,6 @@ pub fn encryption_oracle(input: Vec<u8>, detector: impl FnOnce(&[u8]) -> bool) {
 
         assert!(!detector(&encrypted));
     }
-}
-
-pub fn encryption_oracle_2(input: Vec<u8>, detector: impl Fn(&[u8]) -> bool) {
-    let key: [u8; 16] = rand::random();
-
-    let encrypted = aes_128_ecb_enc(input, &key);
-
-    assert!(!detector(&encrypted));
 }
 
 

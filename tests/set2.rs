@@ -1,11 +1,5 @@
 #![allow(dead_code)]
 
-use itertools::Itertools;
-
-use crypto::buffer::WriteBuffer as _;
-use crypto::symmetriccipher::BlockEncryptor as _;
-use crypto::symmetriccipher::BlockDecryptor as _;
-
 use cryptopals::*;
 
 #[test]
@@ -19,7 +13,7 @@ fn challenge9() {
 
 #[test]
 fn challenge10() {
-    let mut input = hex::decode(include_str!("10.txt")).unwrap();
+    let input = hex::decode(include_str!("10.txt")).unwrap();
 
     let result = aes_128_cbc_dec(&input, b"YELLOW SUBMARINE", &[0u8; 16]);
 
@@ -117,9 +111,61 @@ fn challenge12() {
     assert_eq!(decrypt_starting_with(&[]), b'R');
 
     let mut guess = Vec::new();
-    for _ in 0..block_size-1 {
+    for _ in 0..block_size {
         let ch = decrypt_starting_with(&guess);
         guess.push(ch);
+    }
+
+    
+    // now we know the first block_size bytes, we can use that to brute force the rest of them
+    //
+    // We want to get the value of encrypt_block where the first block_size-1 bytes are *known*,
+    // and the last one is not.
+
+    for decrypt_idx in block_size..encryptor(&[]).len() {
+
+        let padding_amount = (block_size - ((decrypt_idx + 1) % block_size)) % block_size;
+
+        // unknown_string[decrypt_idx] must be at the end of a block
+        assert_eq!((padding_amount + decrypt_idx) % block_size, block_size - 1);
+        assert!(padding_amount < block_size);
+
+        let mut alignment_padding = Vec::new();
+        alignment_padding.resize_with(padding_amount, || 0);
+
+        let encrypted_value = encryptor(&alignment_padding);
+
+        // is this bad code
+        // again, yes
+        let encrypted_block = &encrypted_value[decrypt_idx + padding_amount - block_size .. decrypt_idx + padding_amount];
+        assert_eq!(encrypted_block.len(), block_size);
+
+        // encrypted_block is now a single block where the last byte is unknown, and the first
+        // block_size-1 bytes are the last blocksize-1 bytes of guess
+        //
+        let mut found = false;
+        for guess_byte in 0..=255 {
+            let mut tg = guess[guess.len()-block_size+1..].to_vec();
+            assert_eq!(tg.len(), block_size-1);
+
+            tg.push(guess_byte);
+
+            // this relies on the fact that there's no prefix
+            // we just want to encrypt a single block, nothing fancy
+            // we don't care about the padding
+            // if there was an unknown prefix then we could work it out
+            let encrypted_result = encryptor(&tg);
+
+            let encrypted_block_guess = &encrypted_result[0..block_size];
+
+            assert_eq!(encrypted_block_guess.len(), encrypted_block.len());
+            if encrypted_block_guess == encrypted_block {
+                guess.push(guess_byte);
+                found = true;
+                break;
+            }
+        }
+        assert!(found)
     }
     
     panic!("{:?}", guess);
