@@ -111,7 +111,7 @@ fn challenge12() {
     assert_eq!(decrypt_starting_with(&[]), b'R');
 
     let mut guess = Vec::new();
-    for _ in 0..block_size {
+    for _ in 0..block_size-1 {
         let ch = decrypt_starting_with(&guess);
         guess.push(ch);
     }
@@ -121,14 +121,19 @@ fn challenge12() {
     //
     // We want to get the value of encrypt_block where the first block_size-1 bytes are *known*,
     // and the last one is not.
+    //
+    let message_length = encryptor(&[]).len();
 
-    for decrypt_idx in block_size..encryptor(&[]).len() {
-
+    for decrypt_idx in block_size-1..message_length {
         let padding_amount = (block_size - ((decrypt_idx + 1) % block_size)) % block_size;
 
         // unknown_string[decrypt_idx] must be at the end of a block
         assert_eq!((padding_amount + decrypt_idx) % block_size, block_size - 1);
         assert!(padding_amount < block_size);
+
+        if decrypt_idx % block_size == block_size - 1 {
+            assert!(padding_amount == 0);
+        }
 
         let mut alignment_padding = Vec::new();
         alignment_padding.resize_with(padding_amount, || 0);
@@ -137,7 +142,13 @@ fn challenge12() {
 
         // is this bad code
         // again, yes
-        let encrypted_block = &encrypted_value[decrypt_idx + padding_amount - block_size .. decrypt_idx + padding_amount];
+        let start_of_block = decrypt_idx + padding_amount + 1 - block_size;
+        let end_of_block = decrypt_idx + padding_amount + 1;
+
+        assert_eq!(start_of_block % block_size, 0);
+        assert_eq!(end_of_block % block_size, 0); //exclusive, this is the index of the start of the *next* block
+
+        let encrypted_block = &encrypted_value[start_of_block..end_of_block];
         assert_eq!(encrypted_block.len(), block_size);
 
         // encrypted_block is now a single block where the last byte is unknown, and the first
@@ -145,7 +156,7 @@ fn challenge12() {
         //
         let mut found = false;
         for guess_byte in 0..=255 {
-            let mut tg = guess[guess.len()-block_size+1..].to_vec();
+            let mut tg = guess[guess.len()+1-block_size..].to_vec();
             assert_eq!(tg.len(), block_size-1);
 
             tg.push(guess_byte);
@@ -165,8 +176,17 @@ fn challenge12() {
                 break;
             }
         }
-        assert!(found)
+        if found == false {
+            // we couldn't find a block... let's stop here??????
+            break;
+        }
     }
+
+    let padding_amount = *guess.last().unwrap() as usize;
+
+    let guess_msg = &guess[0..guess.len()-padding_amount-1];
     
-    panic!("{:?}", guess);
+    let final_answer = String::from_utf8(guess_msg.to_vec()).unwrap();
+
+    assert_eq!(final_answer, "Rollin\' in my 5.0\nWith my rag-top down so my hair can blow\nThe girlies on standby waving just to say hi\nDid you stop? No, I just drove by");
 }
