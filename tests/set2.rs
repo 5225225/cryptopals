@@ -189,3 +189,17 @@ fn challenge12() {
 
     assert_eq!(final_answer, "Rollin\' in my 5.0\nWith my rag-top down so my hair can blow\nThe girlies on standby waving just to say hi\nDid you stop? No, I just drove by");
 }
+
+fn challenge13() {
+    let key: [u8; 16] = rand::random();
+
+    let oracle = |username: &str| {
+        let input = profile_for(username).to_vec();
+        aes_128_ecb_enc(input.clone(), &key)
+    };
+
+    let oracle_result = |encrypted: &[u8]| {
+        let decrypted = aes_128_ecb_dec(encrypted, &key);
+        let map: std::collections::HashMap = kvparse(decrypted).into_iter().collect();
+    };
+}

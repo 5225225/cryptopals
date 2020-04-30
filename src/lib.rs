@@ -200,20 +200,60 @@ pub fn pkcs7_padding(input: &mut Vec<u8>, pad_to: usize) {
     assert!(*input.last().unwrap() as usize <= pad_to);
 }
 
-pub fn encryption_oracle(input: Vec<u8>, detector: impl FnOnce(&[u8]) -> bool) {
-    let key: [u8; 16] = rand::random();
-    let iv: [u8; 16] = rand::random();
-    let use_cbc = rand::random();
+pub fn kvparse(input: &str) -> Vec<(String, String)> {
+    let mut ret = Vec::new();
 
-    if use_cbc {
-        let encrypted = aes_128_cbc_enc(input, &key, &iv);
+    for pair in input.split("&") {
+        let mut it = pair.splitn(2, "=");
+        let key = it.next().unwrap().to_string();
+        let value = it.next().unwrap().to_string();
 
-        assert!(detector(&encrypted));
-    } else {
-        let encrypted = aes_128_ecb_enc(input, &key);
-
-        assert!(!detector(&encrypted));
+        ret.push((key, value));
     }
+
+    ret
+}
+
+pub fn kvencode(input: Vec<(String, String)>) -> String {
+    let mut ret = String::new();
+
+    for (key, value) in input {
+        ret.push_str(&key);
+        ret.push_str("=");
+        ret.push_str(&value);
+        ret.push_str("&");
+    }
+
+    ret.truncate(ret.len() - 1);
+
+    ret
+}
+
+#[test]
+fn kvtest() {
+    let parsed = kvparse("foo=bar&baz=qux&zap=zazzle");
+
+    let my_map = vec![
+        ("foo".to_string(), "bar".to_string()),
+        ("baz".to_string(), "qux".to_string()),
+        ("zap".to_string(), "zazzle".to_string()),
+    ];
+
+    assert_eq!(parsed, my_map);
+}
+
+pub fn profile_for(x: &str) -> Vec<(String, String)> {
+    let mut ret = Vec::new();
+
+    if x.contains(|ch| ch == '&' || ch == '=') {
+        panic!("invalid email");
+    }
+
+    ret.push(("role".to_string(), "user".to_string()));
+    ret.push(("uid".to_string(), "10".to_string()));
+    ret.push(("email".to_string(), "x".to_string()));
+
+    ret
 }
 
 use proptest::prelude::*;
