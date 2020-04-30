@@ -229,6 +229,22 @@ pub fn kvencode(input: Vec<(String, String)>) -> String {
     ret
 }
 
+pub fn encryption_oracle(input: Vec<u8>, detector: impl FnOnce(&[u8]) -> bool) {
+    let key: [u8; 16] = rand::random();
+    let iv: [u8; 16] = rand::random();
+    let use_cbc = rand::random();
+
+    if use_cbc {
+        let encrypted = aes_128_cbc_enc(input, &key, &iv);
+
+        assert!(detector(&encrypted));
+    } else {
+        let encrypted = aes_128_ecb_enc(input, &key);
+
+        assert!(!detector(&encrypted));
+    }
+}
+
 #[test]
 fn kvtest() {
     let parsed = kvparse("foo=bar&baz=qux&zap=zazzle");
@@ -249,9 +265,9 @@ pub fn profile_for(x: &str) -> Vec<(String, String)> {
         panic!("invalid email");
     }
 
-    ret.push(("role".to_string(), "user".to_string()));
+    ret.push(("email".to_string(), x.to_string()));
     ret.push(("uid".to_string(), "10".to_string()));
-    ret.push(("email".to_string(), "x".to_string()));
+    ret.push(("role".to_string(), "user".to_string()));
 
     ret
 }

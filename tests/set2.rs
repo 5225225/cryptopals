@@ -190,16 +190,63 @@ fn challenge12() {
     assert_eq!(final_answer, "Rollin\' in my 5.0\nWith my rag-top down so my hair can blow\nThe girlies on standby waving just to say hi\nDid you stop? No, I just drove by");
 }
 
+#[test]
 fn challenge13() {
     let key: [u8; 16] = rand::random();
 
     let oracle = |username: &str| {
         let input = profile_for(username).to_vec();
-        aes_128_ecb_enc(input.clone(), &key)
+        let encoded = kvencode(input);
+        println!("{}", encoded);
+        aes_128_ecb_enc(encoded.into_bytes(), &key)
     };
 
     let oracle_result = |encrypted: &[u8]| {
         let decrypted = aes_128_ecb_dec(encrypted, &key);
-        let map: std::collections::HashMap = kvparse(decrypted).into_iter().collect();
+
+        let decstr = String::from_utf8(decrypted).unwrap();
+
+        dbg!(&decstr);
+
+        let map: std::collections::HashMap<_, _> = kvparse(&decstr).into_iter().collect();
+
+        map["role"] == "admin"
     };
+
+    // we are assuming we already know the format and cipher
+    //
+    // Using an email of foo@arbaz.com, we get 3 blocks
+    //
+    // | email=foo@arbaz | .com&uid=10&role= | user ((padding bytes))
+    //
+    // We then take the first 2 blocks (32 bytes), and get the oracle to encrypt "admin" with the
+    // correct padding bytes.
+
+    let clean = oracle("foo@arbaz.com");
+    assert_eq!(clean.len(), 16 * 3);
+
+    let clean_prefix = &clean[0..32];
+
+    let mut admin_str = String::new();
+
+    // Pad it such that after this we're on a block of our own
+    admin_str.push_str(&"X".repeat(16 - "email=".len()));
+    dbg!(&admin_str);
+
+    // Push something that looks like "admin"
+    admin_str.push_str("admin");
+    dbg!(&admin_str);
+
+    admin_str.push_str(&"\x0b".repeat(0x0b));
+
+    let admin_vec = admin_str.into_bytes();
+
+    let admin_encrypted = oracle(std::str::from_utf8(&admin_vec).unwrap());
+
+    let mut spliced = Vec::new();
+    spliced.extend(clean_prefix);
+    spliced.extend(&admin_encrypted[16..32]);
+    assert_eq!(spliced.len() % 16, 0);
+
+    assert!(oracle_result(&spliced));
 }
