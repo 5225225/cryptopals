@@ -250,3 +250,166 @@ fn challenge13() {
 
     assert!(oracle_result(&spliced));
 }
+
+#[test]
+fn challenge14() {
+    use rand::RngCore;
+
+    let unknown_string = hex::decode(include_str!("12.txt")).unwrap();
+    let mut random_string_full = [0u8; 256];
+    rand::thread_rng().fill_bytes(&mut random_string_full);
+    let random_string_len = rand::random::<u8>() as usize;
+    let random_string = &random_string_full[0..random_string_len];
+    let key: [u8; 16] = rand::random();
+
+    let encryptor = |my_string: &[u8]| {
+        let mut to_encrypt = Vec::new();
+
+        to_encrypt.extend(random_string);
+        to_encrypt.extend(my_string);
+        to_encrypt.extend(&unknown_string);
+
+        aes_128_ecb_enc(to_encrypt, &key)
+    };
+
+    let block_size;
+    let block_offset;
+
+    {
+        // figure out block size
+        let mut my_string = Vec::new();
+        let baseline_size = encryptor(&my_string).len();
+        while encryptor(&my_string).len() == baseline_size {
+            my_string.push(0);
+        }
+
+        let new_baseline_size = encryptor(&my_string).len();
+        while encryptor(&my_string).len() == new_baseline_size {
+            my_string.push(0);
+        }
+
+        block_size = encryptor(&my_string).len() - new_baseline_size;
+        block_offset = new_baseline_size - baseline_size;
+    }
+
+    assert_eq!(block_size, 16);
+
+    let to_add = vec![0u8; block_size * 3];
+
+    let encrypted = encryptor(&to_add);
+
+    let mut chunks = encrypted.chunks_exact(block_size);
+    let a = chunks.next().unwrap();
+    let b = chunks.next().unwrap();
+
+    assert!(a == b);
+    // encrypting same value with same key using ECB gives the same result regardless of position
+
+    let decrypt_starting_with = |input: &[u8]| {
+        assert!(input.len() < block_size);
+
+        let mut guess = Vec::new();
+        guess.resize_with(block_size - 1 - input.len(), || 0);
+
+        println!("{:?}", &guess);
+        let encrypted = encryptor(&guess);
+        let encblock1 = &encrypted[0..block_size];
+
+        for last_byte in 0..=255 {
+            let mut new = Vec::new();
+            new.resize_with(block_size - 1 - input.len(), || 0);
+            new.extend(input);
+            new.push(last_byte);
+
+            assert!(new.len() == block_size);
+            let encrypted_try = encryptor(&new);
+            let encblock1_try = &encrypted_try[0..block_size];
+            if encblock1_try == encblock1 {
+                return last_byte;
+            }
+        }
+
+        panic!("could not find encrypted byte");
+    };
+
+    assert_eq!(decrypt_starting_with(&[]), b'R');
+
+    let mut guess = Vec::new();
+    for _ in 0..block_size - 1 {
+        let ch = decrypt_starting_with(&guess);
+        guess.push(ch);
+    }
+
+    // now we know the first block_size bytes, we can use that to brute force the rest of them
+    //
+    // We want to get the value of encrypt_block where the first block_size-1 bytes are *known*,
+    // and the last one is not.
+    //
+    let message_length = encryptor(&[]).len();
+
+    for decrypt_idx in block_size - 1..message_length {
+        let padding_amount = (block_size - ((decrypt_idx + 1) % block_size)) % block_size;
+
+        // unknown_string[decrypt_idx] must be at the end of a block
+        assert_eq!((padding_amount + decrypt_idx) % block_size, block_size - 1);
+        assert!(padding_amount < block_size);
+
+        if decrypt_idx % block_size == block_size - 1 {
+            assert!(padding_amount == 0);
+        }
+
+        let mut alignment_padding = Vec::new();
+        alignment_padding.resize_with(padding_amount, || 0);
+
+        let encrypted_value = encryptor(&alignment_padding);
+
+        // is this bad code
+        // again, yes
+        let start_of_block = decrypt_idx + padding_amount + 1 - block_size;
+        let end_of_block = decrypt_idx + padding_amount + 1;
+
+        assert_eq!(start_of_block % block_size, 0);
+        assert_eq!(end_of_block % block_size, 0); //exclusive, this is the index of the start of the *next* block
+
+        let encrypted_block = &encrypted_value[start_of_block..end_of_block];
+        assert_eq!(encrypted_block.len(), block_size);
+
+        // encrypted_block is now a single block where the last byte is unknown, and the first
+        // block_size-1 bytes are the last blocksize-1 bytes of guess
+        //
+        let mut found = false;
+        for guess_byte in 0..=255 {
+            let mut tg = guess[guess.len() + 1 - block_size..].to_vec();
+            assert_eq!(tg.len(), block_size - 1);
+
+            tg.push(guess_byte);
+
+            // this relies on the fact that there's no prefix
+            // we just want to encrypt a single block, nothing fancy
+            // we don't care about the padding
+            // if there was an unknown prefix then we could work it out
+            let encrypted_result = encryptor(&tg);
+
+            let encrypted_block_guess = &encrypted_result[0..block_size];
+
+            assert_eq!(encrypted_block_guess.len(), encrypted_block.len());
+            if encrypted_block_guess == encrypted_block {
+                guess.push(guess_byte);
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            // we couldn't find a block... let's stop here??????
+            break;
+        }
+    }
+
+    let padding_amount = *guess.last().unwrap() as usize;
+
+    let guess_msg = &guess[0..guess.len() - padding_amount - 1];
+
+    let final_answer = String::from_utf8(guess_msg.to_vec()).unwrap();
+
+    assert_eq!(final_answer, "Rollin\' in my 5.0\nWith my rag-top down so my hair can blow\nThe girlies on standby waving just to say hi\nDid you stop? No, I just drove by");
+}
